@@ -1,8 +1,11 @@
 import sys
 from pyfiglet import Figlet
+import logging
 
-__version__ = '4.3.0'
+logging.basicConfig(level=logging.INFO)
 f = Figlet(font='speed')
+__version__ = '4.3.0'
+
 
 print(f.renderText('Donkey Car'))
 print(f'using donkey v{__version__} ...')
