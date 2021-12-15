@@ -25,7 +25,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(name='donkeycar',
-      version=__version__,
+
+      version="4.3.1",
       long_description=long_description,
       description='Self driving library for python.',
       url='https://github.com/autorope/donkeycar',
@@ -50,7 +51,7 @@ setup(name='donkeycar',
           'progress',
           'typing_extensions',
           'pyfiglet',
-          'psutil'
+          'psutil',
       ],
       extras_require={
           'pi': [
@@ -65,12 +66,13 @@ setup(name='donkeycar',
               'Adafruit_PCA9685',
               'adafruit-circuitpython-lis3dh',
               'adafruit-circuitpython-ssd1306',
-              'RPi.GPIO'
+              'Jetson.GPIO'
           ],
           'pc': [
               'matplotlib',
               'imgaug',
-              'kivy'
+              'kivy',
+              'pandas'
           ],
           'dev': [
               'pytest',

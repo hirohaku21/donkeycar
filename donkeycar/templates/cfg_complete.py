@@ -26,8 +26,8 @@ MAX_LOOPS = None        # the vehicle loop can abort after this many iterations,
 
 #CAMERA
 CAMERA_TYPE = "PICAM"   # (PICAM|WEBCAM|CVCAM|CSIC|V4L|D435|MOCK|IMAGE_LIST)
-IMAGE_W = 160  # for a CSIC camera this must be 224
-IMAGE_H = 120  # for a CSIC camera this must be 224
+IMAGE_W = 160
+IMAGE_H = 120
 IMAGE_DEPTH = 3         # default RGB=3, make 1 for mono
 CAMERA_FRAMERATE = DRIVE_LOOP_HZ
 CAMERA_VFLIP = False
@@ -147,12 +147,28 @@ PRUNE_PERCENT_PER_ITERATION = 20 # Percenge of pruning that is perform per itera
 PRUNE_VAL_LOSS_DEGRADATION_LIMIT = 0.2 # The max amout of validation loss that is permitted during pruning.
 PRUNE_EVAL_PERCENT_OF_DATASET = .05  # percent of dataset used to perform evaluation of model.
 
-# Region of interest cropping
-# only supported in Categorical and Linear models.
-# If these crops values are too large, they will cause the stride values to become negative and the model with not be valid.
-ROI_CROP_TOP = 0                    #the number of rows of pixels to ignore on the top of the image
-ROI_CROP_BOTTOM = 0                 #the number of rows of pixels to ignore on the bottom of the image
-
+# Augmentations and Transformations
+AUGMENTATIONS = []
+TRANSFORMATIONS = []
+# Settings for brightness and blur, use 'MULTIPLY' and/or 'BLUR' in
+# AUGMENTATIONS
+AUG_MULTIPLY_RANGE = (0.5, 3.0)
+AUG_BLUR_RANGE = (0.0, 3.0)
+# Region of interest cropping, requires 'CROP' in TRANSFORMATIONS to be set
+# If these crops values are too large, they will cause the stride values to
+# become negative and the model with not be valid.
+ROI_CROP_TOP = 45               # the number of rows of pixels to ignore on the top of the image
+ROI_CROP_BOTTOM = 0             # the number of rows of pixels to ignore on the bottom of the image
+ROI_CROP_RIGHT = 0              # the number of rows of pixels to ignore on the right of the image
+ROI_CROP_LEFT = 0               # the number of rows of pixels to ignore on the left of the image
+# For trapezoidal see explanation in augmentations.py. Requires 'TRAPEZE' in
+# TRANSFORMATIONS to be set
+ROI_TRAPEZE_LL = 0
+ROI_TRAPEZE_LR = 160
+ROI_TRAPEZE_UL = 20
+ROI_TRAPEZE_UR = 140
+ROI_TRAPEZE_MIN_Y = 60
+ROI_TRAPEZE_MAX_Y = 120
 
 #Model transfer options
 #When copying weights during a model transfer operation, should we freeze a certain number of layers
@@ -180,7 +196,7 @@ JOYSTICK_DEVICE_FILE = "/dev/input/js0" # this is the unix file use to access th
 #For the categorical model, this limits the upper bound of the learned throttle
 #it's very IMPORTANT that this value is matched from the training PC config.py and the robot.py
 #and ideally wouldn't change once set.
-MODEL_CATEGORICAL_MAX_THROTTLE_RANGE = 0.5
+MODEL_CATEGORICAL_MAX_THROTTLE_RANGE = 0.8
 
 #RNN or 3D
 SEQUENCE_LENGTH = 3             #some models use a number of images over time. This controls how many.
@@ -357,3 +373,9 @@ REALSENSE_D435_ID = None        # serial number of camera or None if you only ha
 STOP_SIGN_DETECTOR = False
 STOP_SIGN_MIN_SCORE = 0.2
 STOP_SIGN_SHOW_BOUNDING_BOX = True
+STOP_SIGN_MAX_REVERSE_COUNT = 10    # How many times should the car reverse when detected a stop sign, set to 0 to disable reversing
+STOP_SIGN_REVERSE_THROTTLE = -0.5     # Throttle during reversing when detected a stop sign
+
+# FPS counter
+SHOW_FPS = False
+FPS_DEBUG_INTERVAL = 10    # the interval in seconds for printing the frequency info into the shell

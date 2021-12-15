@@ -404,10 +404,12 @@
                 id: img_1
                 pilot: pilot_loader_1.pilot
                 throttle_field: data_in.throttle_field
+                is_left: True
             OverlayImage:
                 id: img_2
                 pilot: pilot_loader_2.pilot
                 throttle_field: data_in.throttle_field
+                is_left: False
         PaddedBoxLayout:
             size_hint_y: 0.5
             DataPanel:
@@ -438,7 +440,7 @@
                 id: button_bright
                 size_hint_x: 0.5
                 text: 'Brightness {:4.2f}'.format(slider_bright.value)
-                on_press: root.set_brightness(slider_bright.value) if self.state == 'down' else root.remove_brightness()
+                on_press: root.set_brightness(slider_bright.value)
             Slider:
                 id: slider_bright
                 value: 1
@@ -449,13 +451,22 @@
                 id: button_blur
                 size_hint_x: 0.5
                 text: 'Blur {:4.2f}'.format(slider_blur.value)
-                on_press: root.set_blur(slider_blur.value) if self.state == 'down' else root.remove_blur()
+                on_press: root.set_blur(slider_blur.value)
             Slider:
                 id: slider_blur
                 value: 0
                 min: 0
                 max: 4
                 on_value: root.set_blur(self.value)
+        PaddedBoxLayout:
+            ToggleButton:
+                id: button_mask
+                text: 'Trapezoidal mask'
+                on_press: root.set_mask(self.state)
+            ToggleButton:
+                id: button_crop
+                text: 'Cropping mask'
+                on_press: root.set_crop(self.state)
         PaddedBoxLayout:
             size_hint_y: 0.5
             ControlPanel:
@@ -473,8 +484,10 @@
     font_name: 'data/fonts/RobotoMono-Regular.ttf'
     font_size: 12 if platform == 'linux' else 24
     size_hint_y: None
+    size_hint_x: None
     height: self.texture_size[1]
-    text_size: self.width, None
+    width: self.texture_size[0]
+    #text_size: self.width, None
 
 <TransferSelector>:
     title: 'Choose transfer model'
@@ -497,7 +510,7 @@
         Label:
             size_hint_y: None
             height: common_height
-            text: 'Overwrite config'
+            text: 'Overwrite config: use json syntax, i.e. "abc" for strings and true/false for bool'
         BoxLayout:
             size_hint_y: None
             height: layout_height
@@ -554,6 +567,20 @@
             size_hint_y: 1.0 if check.state == 'down' else 0.1
             DataFrameLabel:
                 id: scroll_tubs
+        BoxLayout:
+            size_hint_y: None
+            height: layout_height
+            padding: layout_pad_xy
+            spacing: layout_pad_x
+            MySpinner:
+                id: delete_spinner
+                text: 'Pilot'
+            Button:
+                id: delete_btn
+                on_press:
+                    root.database.delete_entry(delete_spinner.text)
+                    root.reload_database()
+                text: 'Delete pilot'
         BoxLayout:
             size_hint_y: None
             height: layout_height
@@ -633,7 +660,8 @@
                     self.disabled = True
                     root.pull(tub_dir_spinner.text)
             ProgressBar:
-                value: root.pull_bar
+                id: pull_bar
+                #value: root.pull_bar
         Label:
             #size_hint_y: None
             #height: common_height
@@ -668,7 +696,8 @@
                     self.disabled = True
                     root.send_pilot()
             ProgressBar:
-                value: root.push_bar
+                id: push_bar
+                # value: root.push_bar
 
         Label:
             # size_hint_y: None

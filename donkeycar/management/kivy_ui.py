@@ -1,7 +1,7 @@
 import json
 import re
 import time
-from copy import copy
+from copy import copy, deepcopy
 from datetime import datetime
 from functools import partial
 from subprocess import Popen, PIPE, STDOUT
@@ -251,6 +251,8 @@ class TubLoader(BoxLayout, FileChooserBase):
             tub_screen().status(f'Path {self.file_path} is not a valid tub.')
             return False
         try:
+            if self.tub:
+                self.tub.close()
             self.tub = Tub(self.file_path)
         except Exception as e:
             tub_screen().status(f'Failed loading tub: {str(e)}')
@@ -713,41 +715,39 @@ class OverlayImage(FullImage):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.last_output = (0, 0)
+        self.is_left = True
 
     def augment(self, img_arr):
-        if pilot_screen().auglist:
-            img_arr = pilot_screen().augmentation.augment(img_arr)
+        if pilot_screen().trans_list:
+            img_arr = pilot_screen().transformation.run(img_arr)
+        if pilot_screen().aug_list:
+            img_arr = pilot_screen().augmentation.run(img_arr)
         return img_arr
 
     def get_image(self, record):
         from donkeycar.management.makemovie import MakeMovie
+        config = tub_screen().ids.config_manager.config
         orig_img_arr = super().get_image(record)
         aug_img_arr = self.augment(orig_img_arr)
         img_arr = copy(aug_img_arr)
         angle = record.underlying['user/angle']
         throttle = get_norm_value(
-            record.underlying[self.throttle_field],
-            tub_screen().ids.config_manager.config,
+            record.underlying[self.throttle_field], config,
             rc_handler.field_properties[self.throttle_field])
         rgb = (0, 255, 0)
         MakeMovie.draw_line_into_image(angle, throttle, False, img_arr, rgb)
         if not self.pilot:
             return img_arr
-
-        args = (aug_img_arr, np.array(self.last_output)) \
-            if type(self.pilot) is KerasMemory else (aug_img_arr,)
         output = (0, 0)
         try:
             # Not each model is supported in each interpreter
-            output = self.pilot.run(*args)
+            output = self.pilot.run(aug_img_arr)
         except Exception as e:
             Logger.error(e)
 
-        self.last_output = output
         rgb = (0, 0, 255)
         MakeMovie.draw_line_into_image(output[0], output[1], True, img_arr, rgb)
-        out_record = copy(record)
+        out_record = deepcopy(record)
         out_record.underlying['pilot/angle'] = output[0]
         # rename and denormalise the throttle output
         pilot_throttle_field \
@@ -765,8 +765,10 @@ class PilotScreen(Screen):
     index = NumericProperty(None, force_dispatch=True)
     current_record = ObjectProperty(None)
     keys_enabled = BooleanProperty(False)
-    auglist = ListProperty(force_dispatch=True)
+    aug_list = ListProperty(force_dispatch=True)
     augmentation = ObjectProperty()
+    trans_list = ListProperty(force_dispatch=True)
+    transformation = ObjectProperty()
     config = ObjectProperty()
 
     def on_index(self, obj, index):
@@ -798,7 +800,7 @@ class PilotScreen(Screen):
 
     def map_pilot_field(self, text):
         """ Method to return user -> pilot mapped fields except for the
-            intial vale called Add/remove. """
+            initial value called Add/remove. """
         if text == LABEL_SPINNER_TEXT:
             return text
         return rc_handler.data['user_pilot_map'][text]
@@ -806,30 +808,50 @@ class PilotScreen(Screen):
     def set_brightness(self, val=None):
         if self.ids.button_bright.state == 'down':
             self.config.AUG_MULTIPLY_RANGE = (val, val)
-            if self.ids.button_blur.state == 'down':
-                self.auglist = ['MULTIPLY', 'BLUR']
-            else:
-                self.auglist = ['MULTIPLY']
-
-    def remove_brightness(self):
-        self.auglist = ['BLUR'] if self.ids.button_blur.state == 'down' else[]
+            if 'MULTIPLY' not in self.aug_list:
+                self.aug_list.append('MULTIPLY')
+        elif 'MULTIPLY' in self.aug_list:
+            self.aug_list.remove('MULTIPLY')
+        # update dependency
+        self.on_aug_list(None, None)
 
     def set_blur(self, val=None):
         if self.ids.button_blur.state == 'down':
             self.config.AUG_BLUR_RANGE = (val, val)
-            if self.ids.button_bright.state == 'down':
-                self.auglist = ['MULTIPLY', 'BLUR']
-            else:
-                self.auglist = ['BLUR']
+            if 'BLUR' not in self.aug_list:
+                self.aug_list.append('BLUR')
+        elif 'BLUR' in self.aug_list:
+            self.aug_list.remove('BLUR')
+        # update dependency
+        self.on_aug_list(None, None)
 
-    def remove_blur(self):
-        self.auglist = ['MULTIPLY'] if self.ids.button_bright.state == 'down' \
-            else []
-
-    def on_auglist(self, obj, auglist):
-        self.config.AUGMENTATIONS = self.auglist
-        self.augmentation = ImageAugmentation(self.config)
+    def on_aug_list(self, obj, aug_list):
+        self.config.AUGMENTATIONS = self.aug_list
+        self.augmentation = ImageAugmentation(self.config, 'AUGMENTATIONS')
         self.on_current_record(None, self.current_record)
+
+    def on_trans_list(self, obj, trans_list):
+        self.config.TRANSFORMATIONS = self.trans_list
+        self.transformation = ImageAugmentation(self.config, 'TRANSFORMATIONS')
+        self.on_current_record(None, self.current_record)
+
+    def set_mask(self, state):
+        if state == 'down':
+            self.ids.status.text = 'Trapezoidal mask on'
+            self.trans_list.append('TRAPEZE')
+        else:
+            self.ids.status.text = 'Trapezoidal mask off'
+            if 'TRAPEZE' in self.trans_list:
+                self.trans_list.remove('TRAPEZE')
+
+    def set_crop(self, state):
+        if state == 'down':
+            self.ids.status.text = 'Crop on'
+            self.trans_list.append('CROP')
+        else:
+            self.ids.status.text = 'Crop off'
+            if 'CROP' in self.trans_list:
+                self.trans_list.remove('CROP')
 
     def status(self, msg):
         self.ids.status.text = msg
@@ -874,11 +896,13 @@ class TrainScreen(Screen):
                             comment=self.ids.comment.text)
             self.ids.status.text = f'Training completed.'
             self.ids.comment.text = 'Comment'
-            self.ids.train_button.state = 'normal'
             self.ids.transfer_spinner.text = 'Choose transfer model'
             self.reload_database()
         except Exception as e:
-            self.ids.status.text = f'Train error {e}'
+            Logger.error(e)
+            self.ids.status.text = f'Train failed see console'
+        finally:
+            self.ids.train_button.state = 'normal'
 
     def train(self, model_type):
         self.config.SHOW_PLOT = False
@@ -913,33 +937,14 @@ class TrainScreen(Screen):
             self.database = PilotDatabase(self.config)
 
     def on_database(self, obj, database):
-        if self.ids.check.state == 'down':
-            self.pilot_df, self.tub_df = self.database.to_df_tubgrouped()
-            self.ids.scroll_tubs.text = self.tub_df.to_string()
-        else:
-            self.pilot_df = self.database.to_df()
-            self.tub_df = pd.DataFrame()
-            self.ids.scroll_tubs.text = ''
-
-        self.pilot_df.drop(columns=['History', 'Config'], errors='ignore',
-                           inplace=True)
-        text = self.pilot_df.to_string(formatters=self.formatter())
-        self.ids.scroll_pilots.text = text
-        values = ['Choose transfer model']
-        if not self.pilot_df.empty:
-            values += self.pilot_df['Name'].tolist()
-        self.ids.transfer_spinner.values = values
-
-    @staticmethod
-    def formatter():
-        def time_fmt(t):
-            fmt = '%Y-%m-%d %H:%M:%S'
-            return datetime.fromtimestamp(t).strftime(format=fmt)
-
-        def transfer_fmt(model_name):
-            return model_name.replace('.h5', '')
-
-        return {'Time': time_fmt, 'Transfer': transfer_fmt}
+        group_tubs = self.ids.check.state == 'down'
+        pilot_txt, tub_txt, pilot_names = self.database.pretty_print(group_tubs)
+        self.ids.scroll_tubs.text = tub_txt
+        self.ids.scroll_pilots.text = pilot_txt
+        self.ids.transfer_spinner.values \
+            = ['Choose transfer model'] + pilot_names
+        self.ids.delete_spinner.values \
+            = ['Pilot'] + pilot_names
 
 
 class CarScreen(Screen):
@@ -947,8 +952,6 @@ class CarScreen(Screen):
     config = ObjectProperty(force_dispatch=True, allownone=True)
     files = ListProperty()
     car_dir = StringProperty(rc_handler.data.get('robot_car_dir', '~/mycar'))
-    pull_bar = NumericProperty(0)
-    push_bar = NumericProperty(0)
     event = ObjectProperty(None, allownone=True)
     connection = ObjectProperty(None, allownone=True)
     pid = NumericProperty(None, allownone=True)
@@ -982,9 +985,9 @@ class CarScreen(Screen):
     def pull(self, tub_dir):
         target = f'{self.config.PI_USERNAME}@{self.config.PI_HOSTNAME}' + \
                f':{os.path.join(self.car_dir, tub_dir)}'
+        dest = self.config.DATA_PATH
         if self.ids.create_dir.state == 'normal':
             target += '/'
-        dest = self.config.DATA_PATH
         cmd = ['rsync', '-rv', '--progress', '--partial', target, dest]
         Logger.info('car pull: ' + str(cmd))
         proc = Popen(cmd, shell=False, stdout=PIPE, text=True,
@@ -994,63 +997,82 @@ class CarScreen(Screen):
         event = Clock.schedule_interval(call, 0.0001)
 
     def send_pilot(self):
-        src = self.config.MODELS_PATH
+        # add trailing '/'
+        src = os.path.join(self.config.MODELS_PATH,'')
         # check if any sync buttons are pressed and update path accordingly
         buttons = ['h5', 'savedmodel', 'tflite', 'trt']
         select = [btn for btn in buttons if self.ids[f'btn_{btn}'].state
                   == 'down']
-        # build filter: for example this rsyncs all .tfilte models
-        # --include="*/" --include="*.tflite" --exclude="*"
-        filter = ['--include=*/']
+        # build filter: for example this rsyncs all .tfilte and .trt models
+        # --include=*.trt/*** --include=*.tflite --exclude=*
+        filter = ['--include=database.json']
         for ext in select:
+            if ext in ['savedmodel', 'trt']:
+                ext += '/***'
             filter.append(f'--include=*.{ext}')
         # if nothing selected, sync all
         if not select:
             filter.append('--include=*')
-        filter.append('--exclude=*')
+        else:
+            filter.append('--exclude=*')
         dest = f'{self.config.PI_USERNAME}@{self.config.PI_HOSTNAME}:' + \
-               f'{self.car_dir}'
+               f'{os.path.join(self.car_dir, "models")}'
         cmd = ['rsync', '-rv', '--progress', '--partial', *filter, src, dest]
         Logger.info('car push: ' + ' '.join(cmd))
         proc = Popen(cmd, shell=False, stdout=PIPE,
                      encoding='utf-8', universal_newlines=True)
-        repeats = 1
+        repeats = 0
         call = partial(self.show_progress, proc, repeats, False)
         event = Clock.schedule_interval(call, 0.0001)
 
     def show_progress(self, proc, repeats, is_pull, e):
-        if proc.poll() is not None:
+        # find 'to-check=33/4551)' in OSX or 'to-chk=33/4551)' in
+        # Linux which is end of line
+        pattern = 'to-(check|chk)=(.*)\)'
+
+        def end():
             # call ended this stops the schedule
+            if is_pull:
+                button = self.ids.pull_tub
+                self.ids.pull_bar.value = 0
+                # merge in previous deleted indexes which now might have been
+                # overwritten
+                old_tub = tub_screen().ids.tub_loader.tub
+                if old_tub:
+                    deleted_indexes = old_tub.manifest.deleted_indexes
+                    tub_screen().ids.tub_loader.update_tub()
+                    if deleted_indexes:
+                        new_tub = tub_screen().ids.tub_loader.tub
+                        new_tub.manifest.add_deleted_indexes(deleted_indexes)
+            else:
+                button = self.ids.send_pilots
+                self.ids.push_bar.value = 0
+                self.update_pilots()
+            button.disabled = False
+
+        if proc.poll() is not None:
+            end()
             return False
         # find the next repeats lines with update info
         count = 0
         while True:
             stdout_data = proc.stdout.readline()
             if stdout_data:
-                # find 'to-check=33/4551)' which is end of line
-                pattern = 'to-check=(.*)\)'
                 res = re.search(pattern, stdout_data)
                 if res:
                     if count < repeats:
                         count += 1
                     else:
-                        remain, total = tuple(res.group(1).split('/'))
+                        remain, total = tuple(res.group(2).split('/'))
                         bar = 100 * (1. - float(remain) / float(total))
                         if is_pull:
-                            self.pull_bar = bar
+                            self.ids.pull_bar.value = bar
                         else:
-                            self.push_bar = bar
+                            self.ids.push_bar.value = bar
                         return True
             else:
                 # end of stream command completed
-                if is_pull:
-                    button = self.ids['pull_tub']
-                    self.pull_bar = 0
-                else:
-                    button = self.ids['send_pilots']
-                    self.push_bar = 0
-                    self.update_pilots()
-                button.disabled = False
+                end()
                 return False
 
     def connected(self, event):
@@ -1155,6 +1177,7 @@ class DonkeyApp(App):
         Clock.schedule_once(self.tub_screen.ids.tub_loader.update_tub)
 
     def build(self):
+        Window.bind(on_request_close=self.on_request_close)
         self.start_screen = StartScreen(name='donkey')
         self.tub_screen = TubScreen(name='tub')
         self.train_screen = TrainScreen(name='train')
@@ -1170,6 +1193,13 @@ class DonkeyApp(App):
         sm.add_widget(self.pilot_screen)
         sm.add_widget(self.car_screen)
         return sm
+
+    def on_request_close(self, *args):
+        tub = self.tub_screen.ids.tub_loader.tub
+        if tub:
+            tub.close()
+        Logger.info("Good bye Donkey")
+        return False
 
 
 def main():
