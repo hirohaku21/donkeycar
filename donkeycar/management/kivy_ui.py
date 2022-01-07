@@ -33,7 +33,6 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.spinner import SpinnerOption, Spinner
 
 from donkeycar import load_config
-from donkeycar.parts.keras import KerasMemory
 from donkeycar.parts.tub_v2 import Tub
 from donkeycar.pipeline.augmentations import ImageAugmentation
 from donkeycar.pipeline.database import PilotDatabase
@@ -738,6 +737,7 @@ class OverlayImage(FullImage):
         MakeMovie.draw_line_into_image(angle, throttle, False, img_arr, rgb)
         if not self.pilot:
             return img_arr
+
         output = (0, 0)
         try:
             # Not each model is supported in each interpreter

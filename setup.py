@@ -1,7 +1,6 @@
 import os
 
 from setuptools import find_packages, setup
-from donkeycar import __version__
 
 
 # include the non python files

@@ -66,7 +66,6 @@ def imu_fields() -> List[str]:
 
 
 @pytest.fixture(scope='session')
-
 def car_dir(tmpdir_factory, base_config, imu_fields) -> str:
     """ Creating car dir with sub dirs and extracting tub """
     car_dir = tmpdir_factory.mktemp('mycar')
@@ -115,7 +114,6 @@ d12 = Data(type='linear', name='lin2', convergence=0.7, preprocess='aug')
 d13 = Data(type='linear', name='lin3', convergence=0.7, preprocess='trans')
 
 test_data = [d1, d2, d3, d6, d7, d8, d9, d10, d11, d12]
-
 full_tub = ['imu', 'behavior', 'localizer']
 
 
@@ -141,6 +139,7 @@ def test_train(config: Config, data: Data) -> None:
         add_augmentation_to_config(config)
     elif data.preprocess == 'trans':
         add_transformation_to_config(config)
+
     history = train(config, tub_dir, pilot_path(data.name), data.type)
     loss = history.history['loss']
     # check loss is converging

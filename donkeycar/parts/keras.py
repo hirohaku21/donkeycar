@@ -596,6 +596,7 @@ class KerasIMU(KerasPilot):
                    'out_1': tf.TensorShape([])})
         return shapes
 
+
 class KerasBehavioral(KerasCategorical):
     """
     A Keras part that take an image and Behavior vector as input,
@@ -895,6 +896,7 @@ class KerasLatent(KerasPilot):
         weights = {"img_out": 100.0, "n_outputs0": 2.0, "n_outputs1": 1.0}
         self.interpreter.compile(optimizer=self.optimizer,
                                  loss=loss, loss_weights=weights)
+
     def interpreter_to_output(self, interpreter_out) \
             -> Tuple[Union[float, np.ndarray], ...]:
         steering = interpreter_out[1]
