@@ -414,11 +414,14 @@ class ShowCnnActivations(BaseCommand):
                 self.plt.imshow(layer[:, :, j])
 
         self.plt.show()
+        print('done')
 
     def get_conv_layers(self, model):
         conv_layers = []
         for layer in model.layers:
+            print(layer)
             if layer.__class__.__name__ == 'Conv2D':
+                print("Conv2D find !")
                 conv_layers.append(layer.name)
         return conv_layers
 
