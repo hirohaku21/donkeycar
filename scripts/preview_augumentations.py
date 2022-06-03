@@ -18,7 +18,7 @@ HEIGHT = 480
 
 # Example augumentations
 cropping = Augmentations.crop(0, 0, 100, 0, keep_size=True)
-mask = Augmentations.trapezoidal_mask(10, 630, 100, 300, 50, 480)
+mask = Augmentations.trapezoidal_mask(10, 630, 100, 300, 0, 480)
 
 
 def preview_augmentations():
